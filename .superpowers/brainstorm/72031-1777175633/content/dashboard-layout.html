@@ -1,0 +1,78 @@
+<h2>Dashboard Layout</h2>
+<p class="subtitle">Which layout feels right for a real-time market analysis dashboard?</p>
+
+<div class="cards">
+  <div class="card" data-choice="layout-a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f1117;padding:12px;font-family:monospace;font-size:11px;color:#e2e8f0;border-radius:6px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+        <div style="background:#1a1f2e;padding:6px;border-radius:4px;border-left:3px solid #22c55e">
+          <div style="color:#94a3b8;font-size:9px">NIFTY 50</div>
+          <div style="color:#22c55e;font-size:13px;font-weight:bold">24,173 ▲</div>
+        </div>
+        <div style="background:#1a1f2e;padding:6px;border-radius:4px;border-left:3px solid #ef4444">
+          <div style="color:#94a3b8;font-size:9px">S&P 500</div>
+          <div style="color:#ef4444;font-size:13px;font-weight:bold">5,218 ▼</div>
+        </div>
+        <div style="background:#1a1f2e;padding:6px;border-radius:4px;border-left:3px solid #f59e0b">
+          <div style="color:#94a3b8;font-size:9px">USDINR</div>
+          <div style="color:#f59e0b;font-size:13px;font-weight:bold">94.59</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:6px">
+        <div style="background:#1a1f2e;padding:8px;border-radius:4px">
+          <div style="color:#94a3b8;font-size:9px;margin-bottom:4px">ML PREDICTION — NIFTY 50</div>
+          <div style="color:#ef4444;font-size:16px;font-weight:bold">23,853 ▼ DOWN</div>
+          <div style="color:#64748b;font-size:9px">P(UP): 0.40 · Conf: 0.20 · VIX: 18.59%</div>
+          <div style="margin-top:6px;color:#94a3b8;font-size:9px">LLM ANALYSIS</div>
+          <div style="color:#cbd5e1;font-size:9px;line-height:1.4">Bearish pressure from weak global cues. Crude oil elevated, FII outflows likely...</div>
+        </div>
+        <div style="background:#1a1f2e;padding:8px;border-radius:4px">
+          <div style="color:#94a3b8;font-size:9px;margin-bottom:4px">NEWS FEED</div>
+          <div style="color:#cbd5e1;font-size:9px;line-height:1.6">• Fed holds rates steady<br>• FII sells ₹2,400Cr<br>• Crude hits $96/bbl<br>• RBI policy on hold<br>• IT sector weakness</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Command Center</h3>
+      <p>Dark terminal aesthetic. Indices at top, ML prediction + LLM analysis + news in lower grid. Dense, data-heavy.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="layout-b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:12px;font-family:sans-serif;font-size:11px;color:#1e293b;border-radius:6px">
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <div style="flex:1;background:#fff;padding:6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border-top:3px solid #6366f1">
+          <div style="color:#6366f1;font-size:16px;font-weight:bold">23,853</div>
+          <div style="color:#ef4444;font-size:9px">↓ DOWN · -1.32%</div>
+          <div style="color:#94a3b8;font-size:8px">NIFTY 50 Prediction</div>
+        </div>
+        <div style="flex:2;background:#fff;padding:6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div style="color:#475569;font-size:8px;margin-bottom:3px">GLOBAL INDICES</div>
+          <div style="display:flex;gap:8px">
+            <span style="color:#ef4444;font-size:9px">S&P ▼ 5218</span>
+            <span style="color:#22c55e;font-size:9px">DAX ▲ 18k</span>
+            <span style="color:#ef4444;font-size:9px">HSI ▼ 17k</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div style="background:#fff;padding:6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div style="color:#475569;font-size:8px">ML FACTORS</div>
+          <div style="color:#64748b;font-size:8px;line-height:1.5;margin-top:3px">USDINR: -56<br>USOIL: -38<br>MSCI: -43</div>
+        </div>
+        <div style="background:#fff;padding:6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div style="color:#475569;font-size:8px">AI ANALYSIS</div>
+          <div style="color:#64748b;font-size:8px;line-height:1.4;margin-top:3px">Bearish bias. Watch crude & FII flows for open direction...</div>
+        </div>
+        <div style="background:#fff;padding:6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          <div style="color:#475569;font-size:8px">TOP NEWS</div>
+          <div style="color:#64748b;font-size:8px;line-height:1.5;margin-top:3px">• Fed holds rates<br>• FII -₹2400Cr<br>• RBI on hold</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Clean Light Dashboard</h3>
+      <p>Modern card-based layout. Light theme, purple accent. Easier to scan quickly.</p>
+    </div>
+  </div>
+</div>

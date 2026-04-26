@@ -1,0 +1,35 @@
+<h2>Market Data Sources</h2>
+<p class="subtitle">Where should live index & price data come from? You can pick multiple.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="dhan" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Dhan API</h3>
+      <p>Indian indices & stocks — NIFTY, SENSEX, Bank Nifty, SGX Nifty. Requires your Dhan API key. Best for NSE/BSE data.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="yfinance" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Yahoo Finance (yfinance)</h3>
+      <p>Free, no API key needed. Covers global indices (S&P 500, NASDAQ, DAX, Nikkei, Hang Seng), USDINR, crude oil, MSCI ETFs. Slight delay.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="newsapi" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>NewsAPI / Google News RSS</h3>
+      <p>Free news aggregation for market-moving headlines. Financial news from Reuters, Bloomberg, ET, Moneycontrol, etc.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="alpha" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Alpha Vantage / FRED</h3>
+      <p>Free APIs for macro indicators — FII/DII data, VIX, economic calendar. Supplements other sources.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem">Select all that apply — we can use multiple sources together</p>

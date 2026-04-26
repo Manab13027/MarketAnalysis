@@ -1,0 +1,26 @@
+<h2>How should the analysis engine work?</h2>
+<p class="subtitle">This determines the prediction quality and complexity of the build</p>
+
+<div class="options">
+  <div class="option" data-choice="ml" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>ML Model (like your screenshot)</h3>
+      <p>Ridge Regression / Random Forest trained on historical data. Factors: USDINR, crude oil, MSCI, market breadth, VIX. Gives numeric prediction with confidence score. Takes more time to build but mirrors what you showed.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="llm" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>LLM-Powered (Claude API)</h3>
+      <p>Feed today's data + news headlines to Claude. Get a structured analysis: bullish/bearish signals, key risk factors, next-day outlook in plain English. Fast to build, no training needed.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="both" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both — ML numbers + LLM narrative</h3>
+      <p>ML model gives the quantitative prediction (like your screenshot). Claude then interprets today's news and macro context to add a qualitative layer. Best of both worlds.</p>
+    </div>
+  </div>
+</div>

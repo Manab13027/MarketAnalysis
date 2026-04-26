@@ -1,0 +1,26 @@
+<h2>Tech Stack Preference</h2>
+<p class="subtitle">The ML engine needs Python. The question is what runs the web frontend.</p>
+
+<div class="options">
+  <div class="option" data-choice="python-full" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Python All-in-One (FastAPI + Jinja/HTMX)</h3>
+      <p>Single Python codebase. FastAPI serves the web UI and runs the ML engine. Simple to deploy, no separate frontend build step. Recommended for a personal tool.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="python-react" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Python Backend + React Frontend</h3>
+      <p>FastAPI handles data & ML. React handles the dashboard UI. More polished, richer interactive charts. More complex to set up — two separate processes.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="streamlit" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Streamlit (Pure Python)</h3>
+      <p>Fastest to build. Python only, auto-generates the UI. Great for data dashboards. Less control over design but gets you running in hours, not days.</p>
+    </div>
+  </div>
+</div>
