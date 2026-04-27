@@ -1,4 +1,5 @@
 # backend/ml_engine.py
+import logging
 import os
 import math
 from datetime import date, timedelta
@@ -13,6 +14,9 @@ from sklearn.model_selection import cross_val_score, TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 
 from backend.models import MLPrediction, FactorAdjustment, FactorTodayPred
+from backend.alpha_vantage_client import fetch_daily_series, fetch_fx_daily
+
+logger = logging.getLogger(__name__)
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "data", "model.pkl")
 WINDOW_15D = 15
@@ -42,29 +46,98 @@ class MLEngine:
     # ── Data ─────────────────────────────────────────────────────────────────
 
     def _fetch_historical_data(self, years: int = 5) -> pd.DataFrame:
+        """
+        Fetch historical data:
+        - NIFTY 50: Dhan historical candles API (primary) → yfinance fallback
+        - USDINR, USOIL, MSCI, SP500: Alpha Vantage (primary) → yfinance fallback
+        - VIX: yfinance only (Alpha Vantage doesn't carry ^VIX well)
+        Then merge all into a single DataFrame with columns:
+        nifty, usdinr, usoil, msci, vix, sp500
+        """
         end   = date.today()
         start = end - timedelta(days=years * 365)
-        raw = yf.download(
-            "^NSEI USDINR=X CL=F EFA ^VIX ^GSPC",
-            start=str(start), end=str(end),
-            progress=False, auto_adjust=True,
+
+        # ── NIFTY 50 via Dhan REST ────────────────────────────────────────────
+        nifty_series: Optional[pd.Series] = None
+        dhan_client_id    = os.getenv("DHAN_CLIENT_ID", "")
+        dhan_access_token = os.getenv("DHAN_ACCESS_TOKEN", "")
+
+        if dhan_client_id and dhan_access_token:
+            try:
+                from dhanhq import dhanhq
+                dhan = dhanhq(dhan_client_id, dhan_access_token)
+                resp = dhan.historical_daily_data(
+                    security_id="13",
+                    exchange_segment="IDX_I",
+                    instrument_type="INDEX",
+                    from_date=str(start),
+                    to_date=str(end),
+                )
+                rows = resp.get("data") or []
+                if rows:
+                    df_dhan = pd.DataFrame(rows)
+                    df_dhan["date"] = pd.to_datetime(df_dhan["timestamp"])
+                    df_dhan = df_dhan.set_index("date")[["close"]].rename(columns={"close": "nifty"})
+                    df_dhan.index = df_dhan.index.normalize()
+                    nifty_series = df_dhan["nifty"]
+                    logger.info("MLEngine: loaded NIFTY from Dhan (%d rows)", len(nifty_series))
+            except Exception as exc:
+                logger.warning("MLEngine: Dhan NIFTY fetch failed (%s) — falling back to yfinance", exc)
+
+        if nifty_series is None:
+            raw_nifty = yf.download("^NSEI", start=str(start), end=str(end),
+                                    progress=False, auto_adjust=True)
+            close_col = raw_nifty["Close"]
+            if hasattr(close_col, "squeeze"):
+                close_col = close_col.squeeze()
+            nifty_series = close_col.rename("nifty")
+            nifty_series.index = pd.to_datetime(nifty_series.index).normalize()
+
+        # ── Global factors via Alpha Vantage (fallback to yfinance) ──────────
+        def _av_or_yf(av_df: pd.DataFrame, yf_ticker: str, col_name: str) -> pd.Series:
+            """Use Alpha Vantage series if non-empty, else yfinance."""
+            if not av_df.empty:
+                s = av_df["close"].rename(col_name)
+                s.index = pd.to_datetime(s.index).normalize()
+                return s
+            logger.warning("MLEngine: Alpha Vantage empty for %s — falling back to yfinance %s", col_name, yf_ticker)
+            raw = yf.download(yf_ticker, start=str(start), end=str(end),
+                              progress=False, auto_adjust=True)
+            col = raw["Close"]
+            if hasattr(col, "squeeze"):
+                col = col.squeeze()
+            s = col.rename(col_name)
+            s.index = pd.to_datetime(s.index).normalize()
+            return s
+
+        usdinr_series = _av_or_yf(fetch_fx_daily("USD", "INR", years), "USDINR=X", "usdinr")
+        usoil_series  = _av_or_yf(fetch_daily_series("USO", years),    "CL=F",     "usoil")
+        msci_series   = _av_or_yf(fetch_daily_series("EFA", years),    "EFA",      "msci")
+        sp500_series  = _av_or_yf(fetch_daily_series("SPY", years),    "^GSPC",    "sp500")
+
+        # VIX: yfinance only
+        raw_vix = yf.download("^VIX", start=str(start), end=str(end),
+                              progress=False, auto_adjust=True)
+        vix_col = raw_vix["Close"]
+        if hasattr(vix_col, "squeeze"):
+            vix_col = vix_col.squeeze()
+        vix_series = vix_col.rename("vix")
+        vix_series.index = pd.to_datetime(vix_series.index).normalize()
+
+        # ── Merge all on date index (inner join) ─────────────────────────────
+        merged = (
+            pd.concat([nifty_series, usdinr_series, usoil_series,
+                       msci_series, vix_series, sp500_series], axis=1, join="inner")
+            .dropna()
         )
-        close = raw["Close"].copy()
-        # yfinance returns columns alphabetically; map to friendly names
-        col_map = {}
-        for col in close.columns:
-            s = str(col)
-            if "NSEI" in s:      col_map[col] = "nifty"
-            elif "USDINR" in s:  col_map[col] = "usdinr"
-            elif "CL=F" in s:    col_map[col] = "usoil"
-            elif "EFA" in s:     col_map[col] = "msci"
-            elif "VIX" in s:     col_map[col] = "vix"
-            elif "GSPC" in s:    col_map[col] = "sp500"
-        close = close.rename(columns=col_map)
+        merged.columns = ["nifty", "usdinr", "usoil", "msci", "vix", "sp500"]
+
         needed = {"nifty", "usdinr", "usoil", "msci", "vix", "sp500"}
-        close = close[[c for c in close.columns if c in needed]]
-        close = close.dropna()
-        return close
+        missing = needed - set(merged.columns)
+        if missing:
+            logger.warning("MLEngine: missing columns after merge: %s", missing)
+
+        return merged
 
     # ── Features ─────────────────────────────────────────────────────────────
 
@@ -83,6 +156,16 @@ class MLEngine:
 
     def train(self) -> None:
         hist = self._fetch_historical_data()
+        if hist.empty or len(hist) < 30:
+            # Try loading a previously saved model instead of crashing
+            if self._load_if_needed():
+                import logging
+                logging.warning("MLEngine: yfinance returned insufficient data (%d rows); using cached model.", len(hist))
+                return
+            raise RuntimeError(
+                f"MLEngine: yfinance returned only {len(hist)} rows — need at least 30. "
+                "Check internet connection or yfinance rate limits."
+            )
         self._hist = hist
         X, y = self._build_features(hist)
 

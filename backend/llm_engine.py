@@ -1,11 +1,16 @@
 # backend/llm_engine.py
-import asyncio, json, os
+import asyncio, json, os, time
 from datetime import datetime, timezone
 from typing import Optional
 
 import anthropic
 
 from backend.models import LLMAnalysis
+
+# Alpha Vantage macro snapshot cache (module-level)
+_av_snapshot: dict = {}
+_av_last_fetch: float = 0.0
+AV_REFRESH_INTERVAL = 7200  # 2 hours
 
 SYSTEM_PROMPT = """You are a professional Indian stock market analyst.
 Given real-time market data, an ML model prediction, and recent news headlines,
@@ -33,8 +38,28 @@ class LLMEngine:
         news_headlines: list[str],
         macro:          dict,
         market_status:  str,
+        macro_av:       dict = {},
     ) -> Optional[LLMAnalysis]:
         news_block = "\n".join(f"• {h}" for h in news_headlines[:10])
+
+        av_block = ""
+        if macro_av:
+            sp500_av  = macro_av.get("sp500")
+            nasdaq_av = macro_av.get("nasdaq")
+            usdinr_av = macro_av.get("usdinr")
+            parts = []
+            if sp500_av:
+                parts.append(f"- S&P 500 (SPY): {sp500_av.get('price', 'N/A')} ({sp500_av.get('change_pct', 'N/A'):+.2f}%)")
+            if nasdaq_av:
+                parts.append(f"- NASDAQ (QQQ): {nasdaq_av.get('price', 'N/A')} ({nasdaq_av.get('change_pct', 'N/A'):+.2f}%)")
+            if usdinr_av:
+                parts.append(f"- USD/INR: {usdinr_av}")
+            if parts:
+                fetched = macro_av.get("fetched_at", "")
+                av_block = "\nAlpha Vantage Macro Data (as of {}):\n{}".format(
+                    fetched, "\n".join(parts)
+                )
+
         user_msg = f"""Market Status: {market_status}
 
 ML Prediction:
@@ -45,7 +70,7 @@ Macro Snapshot:
 - WTI Crude: ${macro.get('wti_crude', 'N/A')}
 - VIX: {macro.get('vix', 'N/A')}
 - S&P 500: {macro.get('sp500', 'N/A')}
-
+{av_block}
 Recent Headlines:
 {news_block}
 
@@ -80,9 +105,26 @@ Produce the JSON analysis now."""
 
 async def start_llm_engine(app_state: dict, db_path: str) -> None:
     from backend.db import save_llm_analysis
+    from backend.alpha_vantage_client import fetch_macro_snapshot
+
+    global _av_snapshot, _av_last_fetch
+
     engine = LLMEngine()
     while True:
-        await asyncio.sleep(300)   # every 5 minutes
+        await asyncio.sleep(300)   # LLM runs every 5 minutes
+
+        # Refresh Alpha Vantage macro snapshot every 2 hours
+        now = time.monotonic()
+        if now - _av_last_fetch > AV_REFRESH_INTERVAL:
+            try:
+                loop = asyncio.get_running_loop()
+                snapshot = await loop.run_in_executor(None, fetch_macro_snapshot)
+                if snapshot:
+                    _av_snapshot = snapshot
+                    _av_last_fetch = now
+            except Exception as exc:
+                print(f"[llm_engine] alpha_vantage snapshot error: {exc}")
+
         try:
             payload = app_state.get("latest_payload") or {}
             ml_obj  = payload.get("ml_prediction")
@@ -104,7 +146,7 @@ async def start_llm_engine(app_state: dict, db_path: str) -> None:
                 "sp500":     movers.get("sp500", 0),
             }
             status = (payload.get("market_status") or {}).get("status", "unknown")
-            analysis = engine.analyze(ml_summary, headlines, macro, status)
+            analysis = engine.analyze(ml_summary, headlines, macro, status, macro_av=_av_snapshot)
             if analysis:
                 app_state["latest_llm_analysis"] = analysis
                 await save_llm_analysis(db_path, {
