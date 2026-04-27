@@ -9,16 +9,22 @@ from backend.holiday_calendar import current_market_status
 
 # ── Ticker maps ───────────────────────────────────────────────────────────────
 
-SPOT_INDICES: list[tuple[str, str]] = [
+INDIAN_INDICES: list[tuple[str, str]] = [
     ("^NSEI",    "NIFTY 50"),
     ("^BSESN",   "SENSEX"),
     ("^NSEBANK", "Bank NIFTY"),
-    ("^GSPC",    "S&P 500"),
-    ("^IXIC",    "NASDAQ"),
-    ("^GDAXI",   "DAX"),
-    ("^N225",    "Nikkei 225"),
-    ("^HSI",     "Hang Seng"),
 ]
+
+GLOBAL_INDICES: list[tuple[str, str]] = [
+    ("^GSPC",  "S&P 500"),
+    ("^IXIC",  "NASDAQ"),
+    ("^GDAXI", "DAX"),
+    ("^N225",  "Nikkei 225"),
+    ("^HSI",   "Hang Seng"),
+]
+
+# Combined for callers that need the full list (backwards compat for tests)
+SPOT_INDICES: list[tuple[str, str]] = INDIAN_INDICES + GLOBAL_INDICES
 
 FUTURES_INDICES: list[tuple[str, str]] = [
     ("ES=F",  "S&P 500 Fut"),
@@ -108,42 +114,6 @@ def fetch_market_movers() -> MarketMovers:
     )
 
 
-def fetch_dhan_quotes() -> list[IndexQuote]:
-    """Fetch NIFTY 50, SENSEX, Bank NIFTY via Dhan API if credentials are set."""
-    client_id    = os.getenv("DHAN_CLIENT_ID", "")
-    access_token = os.getenv("DHAN_ACCESS_TOKEN", "")
-    if not client_id or not access_token:
-        return []
-    try:
-        from dhanhq import dhanhq
-        dhan = dhanhq(client_id, access_token)
-        DHAN_INDICES = [
-            ("13",  "NIFTY 50",   "^NSEI"),
-            ("25",  "SENSEX",     "^BSESN"),
-            ("21",  "Bank NIFTY", "^NSEBANK"),
-        ]
-        quotes: list[IndexQuote] = []
-        for security_id, name, fallback_sym in DHAN_INDICES:
-            try:
-                resp = dhan.get_ltp_data(
-                    security_id=security_id,
-                    exchange_segment=dhan.NSE,
-                    instrument_type="INDEX",
-                )
-                price = float(resp["data"]["last_price"])
-                prev  = float(resp["data"]["close_price"])
-                quotes.append(IndexQuote(
-                    symbol=fallback_sym,
-                    name=name,
-                    price=round(price, 2),
-                    change=round(price - prev, 2),
-                    change_pct=_pct_change(price, prev),
-                ))
-            except Exception:
-                continue
-        return quotes
-    except Exception:
-        return []
 
 
 # ── Main polling loop ─────────────────────────────────────────────────────────
@@ -166,10 +136,19 @@ async def start_data_engine(
             )
 
             if status_str in ("open", "pre_open"):
-                dhan_quotes = fetch_dhan_quotes()
-                yf_quotes   = fetch_yfinance_quotes(SPOT_INDICES)
-                dhan_syms   = {q.symbol for q in dhan_quotes}
-                indices     = dhan_quotes + [q for q in yf_quotes if q.symbol not in dhan_syms]
+                from backend.dhan_feed import get_latest_indian_quotes, _connected as dhan_connected
+                global_quotes = fetch_yfinance_quotes(GLOBAL_INDICES)
+                if dhan_connected:
+                    dhan_quotes = get_latest_indian_quotes()
+                else:
+                    dhan_quotes = []
+                if dhan_quotes:
+                    dhan_syms    = {q.symbol for q in dhan_quotes}
+                    indian_yf    = [q for q in fetch_yfinance_quotes(INDIAN_INDICES) if q.symbol not in dhan_syms]
+                    indian_quotes = dhan_quotes + indian_yf
+                else:
+                    indian_quotes = fetch_yfinance_quotes(INDIAN_INDICES)
+                indices = indian_quotes + global_quotes
             else:
                 indices = fetch_yfinance_quotes(SPOT_INDICES) + fetch_futures_quotes()
 

@@ -44,6 +44,7 @@ app_state: dict[str, Any] = {
     "data_engine_task": None,
     "llm_engine_task": None,
     "news_engine_task": None,
+    "dhan_feed_task": None,
     "latest_llm_analysis": None,
     "latest_news": [],
 }
@@ -73,9 +74,12 @@ async def lifespan(app: FastAPI):
         start_news_engine(app_state, DB_PATH)
     )
 
+    from backend.dhan_feed import start_dhan_feed
+    app_state["dhan_feed_task"] = asyncio.create_task(start_dhan_feed())
+
     yield
 
-    for task_key in ("data_engine_task", "llm_engine_task", "news_engine_task"):
+    for task_key in ("data_engine_task", "llm_engine_task", "news_engine_task", "dhan_feed_task"):
         task = app_state.get(task_key)
         if task:
             task.cancel()
@@ -84,7 +88,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Market Analysis Dashboard", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5174"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
