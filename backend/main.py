@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     await init_db(DB_PATH)
 
     ml = MLEngine(db_path=DB_PATH)
-    await asyncio.get_event_loop().run_in_executor(None, ml.train)
+    await asyncio.get_running_loop().run_in_executor(None, ml.train)
     app_state["ml_engine"] = ml
 
     app_state["data_engine_task"] = asyncio.create_task(
@@ -98,7 +98,7 @@ async def health():
 @app.post("/api/ml/retrain")
 async def retrain():
     ml = app_state["ml_engine"]
-    await asyncio.get_event_loop().run_in_executor(None, ml.train)
+    await asyncio.get_running_loop().run_in_executor(None, ml.train)
     return {"status": "retrained", "cv_mape": ml.cv_mape, "cv_dir_accuracy": ml.cv_dir_accuracy}
 
 

@@ -31,8 +31,15 @@ def is_nse_holiday(d: date) -> bool:
     return False
 
 
+def _is_weekday_holiday(d: date) -> bool:
+    """True only for named holidays (not weekends)."""
+    return d.weekday() < 5 and (d in _in_holidays or d in NSE_EXTRA_HOLIDAYS_2026)
+
+
 def get_market_status(d: date, t: time) -> MarketStatusLiteral:
-    if is_nse_holiday(d):
+    if _is_weekday_holiday(d):
+        return "holiday"
+    if d.weekday() >= 5:   # weekend — futures still trade
         return "futures_mode"
     if t < PRE_OPEN_START:
         return "closed"
