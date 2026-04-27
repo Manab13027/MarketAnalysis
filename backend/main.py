@@ -9,7 +9,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
+load_dotenv(override=True)
+# Claude Desktop sets ANTHROPIC_API_KEY="" in system env — force values from .env
+import pathlib as _pl
+from dotenv import dotenv_values as _dv
+_env_path = _pl.Path(__file__).parent.parent / ".env"
+for _k, _v in _dv(_env_path).items():
+    if _v:
+        os.environ[_k] = _v
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "market.db")
 
@@ -45,6 +52,7 @@ app_state: dict[str, Any] = {
     "llm_engine_task": None,
     "news_engine_task": None,
     "dhan_feed_task": None,
+    "twelve_data_feed_task": None,
     "latest_llm_analysis": None,
     "latest_news": [],
 }
@@ -77,9 +85,12 @@ async def lifespan(app: FastAPI):
     from backend.dhan_feed import start_dhan_feed
     app_state["dhan_feed_task"] = asyncio.create_task(start_dhan_feed())
 
+    from backend.twelve_data_feed import start_twelve_data_feed
+    app_state["twelve_data_feed_task"] = asyncio.create_task(start_twelve_data_feed())
+
     yield
 
-    for task_key in ("data_engine_task", "llm_engine_task", "news_engine_task", "dhan_feed_task"):
+    for task_key in ("data_engine_task", "llm_engine_task", "news_engine_task", "dhan_feed_task", "twelve_data_feed_task"):
         task = app_state.get(task_key)
         if task:
             task.cancel()

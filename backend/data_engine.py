@@ -101,7 +101,7 @@ def fetch_market_movers() -> MarketMovers:
         except Exception:
             return 0.0
 
-    return MarketMovers(
+    movers = MarketMovers(
         usdinr=_price("usdinr"),
         wti_crude=_price("wti_crude"),
         brent_crude=_price("brent_crude"),
@@ -112,6 +112,21 @@ def fetch_market_movers() -> MarketMovers:
         sp500=_price("sp500"),
         sp500_futures=_price("sp500_futures") or None,
     )
+
+    # Override with Twelve Data live prices where available
+    from backend.twelve_data_feed import get_price as td_get_price, _connected as td_connected
+    if td_connected:
+        td_gold   = td_get_price("gold")
+        td_usdinr = td_get_price("usdinr")
+        updates: dict = {}
+        if td_gold:
+            updates["gold"] = td_gold
+        if td_usdinr:
+            updates["usdinr"] = td_usdinr
+        if updates:
+            movers = movers.model_copy(update=updates)
+
+    return movers
 
 
 
@@ -158,6 +173,11 @@ async def start_data_engine(
             ml_engine = app_state.get("ml_engine")
             ml_pred = None
             if ml_engine and movers.usdinr > 0:
+                # Get live NIFTY price from indices for accurate today_close
+                nifty_live = next(
+                    (q.price for q in indices if q.symbol == "^NSEI" and q.price > 0),
+                    None,
+                )
                 loop = asyncio.get_running_loop()
                 ml_pred = await loop.run_in_executor(
                     None,
@@ -167,6 +187,7 @@ async def start_data_engine(
                     movers.msci,
                     movers.vix,
                     movers.sp500,
+                    nifty_live,
                 )
 
             payload = WSMessage(
