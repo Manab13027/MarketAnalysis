@@ -1,5 +1,5 @@
 # backend/data_engine.py
-import asyncio, os
+import asyncio, os, time
 from datetime import datetime, timezone
 from typing import Any
 import yfinance as yf
@@ -45,7 +45,11 @@ MOVERS_TICKERS: dict[str, str] = {
     "sp500_futures": "ES=F",
 }
 
-POLL_INTERVAL = 10  # seconds
+POLL_INTERVAL    = 10   # seconds
+MOVERS_INTERVAL  = 60   # seconds
+
+_movers_cache: dict[str, Any] = {}
+_movers_last_fetch: float = 0.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -190,6 +194,20 @@ async def start_data_engine(
                     nifty_live,
                 )
 
+            # ── Index movers (every 60 s) ──────────────────────────────────
+            global _movers_cache, _movers_last_fetch
+            now_mono = time.monotonic()
+            if now_mono - _movers_last_fetch > MOVERS_INTERVAL:
+                from backend.market_breadth import fetch_index_movers
+                loop = asyncio.get_running_loop()
+                for key in ("nifty50", "banknifty", "midcap", "sensex"):
+                    try:
+                        result = await loop.run_in_executor(None, fetch_index_movers, key)
+                        _movers_cache[key] = result
+                    except Exception as e:
+                        print(f"[data_engine] movers error {key}: {e}")
+                _movers_last_fetch = now_mono
+
             payload = WSMessage(
                 type="market_update",
                 timestamp=datetime.now(timezone.utc),
@@ -199,6 +217,7 @@ async def start_data_engine(
                 llm_analysis=app_state.get("latest_llm_analysis"),
                 news=app_state.get("latest_news", []),
                 market_movers=movers,
+                index_movers=_movers_cache if _movers_cache else None,
             ).model_dump()
 
             app_state["latest_payload"] = payload

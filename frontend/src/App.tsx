@@ -5,6 +5,7 @@ import { MLPredictionPanel }   from './components/MLPredictionPanel'
 import { LLMAnalysisPanel }    from './components/LLMAnalysisPanel'
 import { NewsFeed }            from './components/NewsFeed'
 import { MarketMoversStrip }   from './components/MarketMoversStrip'
+import { MoversPanel }         from './components/MoversPanel'
 
 const WS_URL = 'ws://localhost:8000/ws'
 
@@ -12,8 +13,7 @@ export default function App() {
   const { message, status } = useWebSocket(WS_URL)
 
   const handleRefreshLLM = async () => {
-    try { await fetch('/api/llm/refresh', { method: 'POST' }) }
-    catch { /* ignore */ }
+    try { await fetch('/api/llm/refresh', { method: 'POST' }) } catch { /* ignore */ }
   }
 
   return (
@@ -28,7 +28,14 @@ export default function App() {
       <div className="flex-1 grid grid-cols-3 gap-2 p-2 min-h-0">
         <MLPredictionPanel pred={message?.ml_prediction ?? null} />
         <LLMAnalysisPanel analysis={message?.llm_analysis ?? null} onRefresh={handleRefreshLLM} />
-        <NewsFeed news={message?.news ?? []} />
+        <div className="flex flex-col gap-2 min-h-0">
+          <div className="flex-1 min-h-0">
+            <MoversPanel movers={message?.index_movers} />
+          </div>
+          <div className="flex-1 min-h-0">
+            <NewsFeed news={message?.news ?? []} />
+          </div>
+        </div>
       </div>
       <MarketMoversStrip movers={message?.market_movers ?? null} />
     </div>

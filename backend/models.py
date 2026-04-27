@@ -3,6 +3,21 @@ from typing import Optional, Literal
 from datetime import datetime
 
 
+class StockMover(BaseModel):
+    symbol: str
+    name:   str = ""
+    price:  float
+    change: float
+    change_pct: float
+
+
+class IndexMovers(BaseModel):
+    index_key:  str   # "nifty50" | "banknifty" | "midcap" | "sensex"
+    gainers:    list[StockMover]
+    losers:     list[StockMover]
+    updated_at: datetime
+
+
 class FactorAdjustment(BaseModel):
     value: float        # adjustment in index points
     beta: float
@@ -91,3 +106,4 @@ class WSMessage(BaseModel):
     llm_analysis: Optional[LLMAnalysis] = None
     news: list[NewsItem]
     market_movers: MarketMovers
+    index_movers: Optional[dict[str, IndexMovers]] = None

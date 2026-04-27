@@ -41,10 +41,24 @@ export interface MarketStatus {
   status: "open" | "closed" | "holiday" | "futures_mode" | "pre_open";
   message: string | null;
 }
+export interface StockMover {
+  symbol: string
+  name:   string
+  price:  number
+  change: number
+  change_pct: number
+}
+export interface IndexMovers {
+  index_key: string
+  gainers:   StockMover[]
+  losers:    StockMover[]
+  updated_at: string
+}
 export interface WSMessage {
   type: "market_update" | "error";
   timestamp: string; market_status: MarketStatus;
   indices: IndexQuote[]; ml_prediction: MLPrediction | null;
   llm_analysis: LLMAnalysis | null; news: NewsItem[];
   market_movers: MarketMovers;
+  index_movers?: Record<string, IndexMovers>
 }
