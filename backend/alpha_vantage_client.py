@@ -146,10 +146,13 @@ def fetch_macro_snapshot() -> dict:
         )
         resp.raise_for_status()
         quote = resp.json().get("Global Quote", {})
-        result["sp500"] = {
-            "price": float(quote["05. price"]),
-            "change_pct": float(quote["10. change percent"].rstrip("%")),
-        }
+        if quote and "05. price" in quote:
+            result["sp500"] = {
+                "price": float(quote["05. price"]),
+                "change_pct": float(quote["10. change percent"].rstrip("%")),
+            }
+        else:
+            logger.warning("alpha_vantage: GLOBAL_QUOTE SPY empty (rate-limited?)")
     except Exception as exc:
         logger.warning("alpha_vantage: GLOBAL_QUOTE SPY failed: %s", exc)
 
@@ -162,10 +165,13 @@ def fetch_macro_snapshot() -> dict:
         )
         resp.raise_for_status()
         quote = resp.json().get("Global Quote", {})
-        result["nasdaq"] = {
-            "price": float(quote["05. price"]),
-            "change_pct": float(quote["10. change percent"].rstrip("%")),
-        }
+        if quote and "05. price" in quote:
+            result["nasdaq"] = {
+                "price": float(quote["05. price"]),
+                "change_pct": float(quote["10. change percent"].rstrip("%")),
+            }
+        else:
+            logger.warning("alpha_vantage: GLOBAL_QUOTE QQQ empty (rate-limited?)")
     except Exception as exc:
         logger.warning("alpha_vantage: GLOBAL_QUOTE QQQ failed: %s", exc)
 
@@ -183,7 +189,10 @@ def fetch_macro_snapshot() -> dict:
         )
         resp.raise_for_status()
         rate_data = resp.json().get("Realtime Currency Exchange Rate", {})
-        result["usdinr"] = float(rate_data["5. Exchange Rate"])
+        if rate_data and "5. Exchange Rate" in rate_data:
+            result["usdinr"] = float(rate_data["5. Exchange Rate"])
+        else:
+            logger.warning("alpha_vantage: CURRENCY_EXCHANGE_RATE USD/INR empty (rate-limited?)")
     except Exception as exc:
         logger.warning("alpha_vantage: CURRENCY_EXCHANGE_RATE USD/INR failed: %s", exc)
 

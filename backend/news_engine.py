@@ -8,6 +8,7 @@ from newsapi import NewsApiClient
 
 from backend.models import NewsItem
 
+
 POSITIVE_WORDS = {
     "surge","rally","gain","rise","jump","bull","record","growth","profit",
     "beat","recovery","up","high","strong","positive","boost","soar",
@@ -67,7 +68,7 @@ class NewsEngine:
             if item.id not in seen:
                 seen.add(item.id)
                 unique.append(item)
-        return sorted(unique, key=lambda x: x.published_at, reverse=True)[:30]
+        return sorted(unique, key=lambda x: x.published_at, reverse=True)[:40]
 
     def _fetch_newsapi(self) -> list[NewsItem]:
         if not self._client:
@@ -124,12 +125,37 @@ class NewsEngine:
 
 async def start_news_engine(app_state: dict, db_path: str) -> None:
     from backend.db import save_news_item
+    from backend.telegram_feed import fetch_telegram_posts
     engine = NewsEngine()
     while True:
         try:
             items = engine.fetch()
-            app_state["latest_news"] = items
+
+            # Merge in Telegram posts (async, MTProto)
+            tg_posts = await fetch_telegram_posts(limit=20)
+            for p in tg_posts:
+                news_item = NewsItem(
+                    id=_make_id(p["url"]),
+                    title=p["title"],
+                    source=p["source"],
+                    url=p["url"],
+                    published_at=p["published_at"],
+                    sentiment=tag_sentiment(p["title"]),
+                    region=tag_region(p["title"]),
+                )
+                items.append(news_item)
+
+            # Deduplicate + sort
+            seen: set[str] = set()
+            unique: list[NewsItem] = []
             for item in items:
+                if item.id not in seen:
+                    seen.add(item.id)
+                    unique.append(item)
+            unique = sorted(unique, key=lambda x: x.published_at, reverse=True)[:50]
+
+            app_state["latest_news"] = unique
+            for item in unique:
                 await save_news_item(db_path, {
                     "id": item.id, "title": item.title, "source": item.source,
                     "url": item.url, "published_at": item.published_at.isoformat(),

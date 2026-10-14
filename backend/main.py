@@ -82,15 +82,24 @@ async def lifespan(app: FastAPI):
         start_news_engine(app_state, DB_PATH)
     )
 
-    from backend.dhan_feed import start_dhan_feed
-    app_state["dhan_feed_task"] = asyncio.create_task(start_dhan_feed())
+    # Dhan disabled — Upstox used instead (no daily token refresh needed)
+    # from backend.dhan_feed import start_dhan_feed
+    # app_state["dhan_feed_task"] = asyncio.create_task(start_dhan_feed())
 
     from backend.twelve_data_feed import start_twelve_data_feed
     app_state["twelve_data_feed_task"] = asyncio.create_task(start_twelve_data_feed())
 
+    from backend.upstox_feed import start_upstox_feed
+    app_state["upstox_feed_task"] = asyncio.create_task(start_upstox_feed())
+
+    from backend.crypto_feed import start_crypto_feed
+    app_state["crypto_feed_task"] = asyncio.create_task(start_crypto_feed())
+
     yield
 
-    for task_key in ("data_engine_task", "llm_engine_task", "news_engine_task", "dhan_feed_task", "twelve_data_feed_task"):
+    for task_key in ("data_engine_task", "llm_engine_task", "news_engine_task",
+                     "dhan_feed_task", "twelve_data_feed_task", "upstox_feed_task",
+                     "crypto_feed_task"):
         task = app_state.get(task_key)
         if task:
             task.cancel()
@@ -127,6 +136,59 @@ async def llm_refresh():
         start_llm_engine(app_state, DB_PATH)
     )
     return {"status": "refreshing"}
+
+
+
+# ── Upstox OAuth endpoints ────────────────────────────────────────────────────
+
+@app.get("/upstox/auth")
+async def upstox_auth():
+    """Redirect browser to Upstox login. Visit once per day."""
+    from fastapi.responses import RedirectResponse
+    from backend.upstox_feed import get_auth_url
+    return RedirectResponse(get_auth_url())
+
+
+@app.get("/upstox/callback")
+async def upstox_callback(code: str):
+    """Upstox redirects here after login. Exchanges code for token, starts feed."""
+    from fastapi.responses import HTMLResponse
+    from backend.upstox_feed import exchange_code_for_token, set_access_token, start_upstox_feed
+
+    try:
+        token = exchange_code_for_token(code)
+        set_access_token(token)
+
+        # Restart the upstox feed task with the new token
+        old_task = app_state.get("upstox_feed_task")
+        if old_task:
+            old_task.cancel()
+        app_state["upstox_feed_task"] = asyncio.create_task(start_upstox_feed())
+
+        return HTMLResponse("""
+            <html><body style="font-family:monospace;background:#0f1117;color:#00ff88;padding:40px">
+            <h2>✅ Upstox Connected</h2>
+            <p>Live NIFTY futures feed is now active.</p>
+            <p>Token saved to .env — valid until midnight IST.</p>
+            <script>setTimeout(()=>window.close(), 3000)</script>
+            </body></html>
+        """)
+    except Exception as exc:
+        return HTMLResponse(f"""
+            <html><body style="font-family:monospace;background:#0f1117;color:#ff4444;padding:40px">
+            <h2>❌ Auth failed</h2><pre>{exc}</pre>
+            </body></html>
+        """, status_code=400)
+
+
+@app.get("/upstox/status")
+async def upstox_status():
+    from backend.upstox_feed import _connected, _futures_map
+    return {
+        "connected": _connected,
+        "futures": [v["label"] for v in _futures_map.values()],
+        "auth_url": "http://localhost:8000/upstox/auth",
+    }
 
 
 @app.websocket("/ws")

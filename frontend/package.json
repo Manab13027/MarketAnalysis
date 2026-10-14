@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "lsof -ti:5174 | xargs kill -9 2>/dev/null; exit 0",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

@@ -14,21 +14,46 @@ _latest: dict[str, float] = {}   # internal key → latest price
 _connected: bool = False
 
 # ── Symbol map ────────────────────────────────────────────────────────────────
+# Maps Twelve Data symbol → internal key used by data_engine / movers
 
 SYMBOL_MAP: dict[str, str] = {
+    # Forex / commodities (original)
     "XAU/USD": "gold",
     "USD/INR": "usdinr",
+    # US indices
+    "SPX":     "^GSPC",
+    "NDX":     "^IXIC",
+    "DJI":     "^DJI",
+    # US index futures
+    "ES1!":    "ES=F",
+    "NQ1!":    "NQ=F",
+    "YM1!":    "YM=F",
+    # European
+    "DAX":     "^GDAXI",
+    "FTSE":    "^FTSE",
+    # Asia-Pacific
+    "NI225":   "^N225",
+    "HSI":     "^HSI",
+    # Commodities
+    "WTI/USD": "wti_crude",
+    "XAG/USD": "silver",
 }
 
-SUBSCRIBE_SYMBOLS: list[str] = list(SYMBOL_MAP.keys())   # ["XAU/USD", "USD/INR"]
+SUBSCRIBE_SYMBOLS: list[str] = list(SYMBOL_MAP.keys())
 
 _WS_URL = "wss://ws.twelvedata.com/v1/quotes/price"
 
 # ── Public getter ─────────────────────────────────────────────────────────────
 
 def get_price(symbol_key: str) -> float | None:
-    """Return latest price by internal key (e.g. 'gold', 'usdinr'), or None."""
+    """Return latest price by internal key (e.g. 'gold', 'usdinr', '^GSPC'), or None."""
     return _latest.get(symbol_key)
+
+
+def get_live_index_prices() -> dict[str, float]:
+    """Return {yfinance_symbol: price} for all live index prices (^GSPC, ^IXIC, etc.)."""
+    index_keys = {v for v in SYMBOL_MAP.values() if v.startswith('^') or v.endswith('=F')}
+    return {k: v for k, v in _latest.items() if k in index_keys}
 
 
 # ── Feed coroutine ────────────────────────────────────────────────────────────

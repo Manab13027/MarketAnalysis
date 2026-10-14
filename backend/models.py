@@ -1,6 +1,38 @@
 from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
+
+
+class FIIDIIEntry(BaseModel):
+    category:   str    # "FII/FPI" | "DII"
+    date:       str
+    # ── Cash market (₹ Crore) ─────────────────────────────────────────────────
+    cash_buy:   float
+    cash_sell:  float
+    cash_net:   float
+    # ── F&O — Index Futures (contracts) ──────────────────────────────────────
+    fut_idx_long:  Optional[int] = None
+    fut_idx_short: Optional[int] = None
+    # ── F&O — Index Options (Call+Put Long / Short) ───────────────────────────
+    opt_idx_long:  Optional[int] = None
+    opt_idx_short: Optional[int] = None
+    # ── F&O — Stock Futures (contracts) ──────────────────────────────────────
+    fut_stk_long:  Optional[int] = None
+    fut_stk_short: Optional[int] = None
+    # ── Totals ────────────────────────────────────────────────────────────────
+    total_long:    Optional[int] = None
+    total_short:   Optional[int] = None
+
+
+class FuturesContract(BaseModel):
+    label:         str          # e.g. "NIFTY Apr", "GIFT NIFTY"
+    expiry:        str          # e.g. "24-Apr-2025"
+    price:         float
+    change:        float
+    change_pct:    float
+    oi:            Optional[float] = None   # open interest
+    is_gift:       bool = False
+    is_prev_close: bool = False  # True = bhav copy (prev close), market closed
 
 
 class StockMover(BaseModel):
@@ -65,11 +97,23 @@ class MarketMovers(BaseModel):
     wti_crude: float
     brent_crude: float
     gold: float
+    silver: Optional[float] = None
     vix: float
     us10y: float
     msci: float
     sp500: float
     sp500_futures: Optional[float] = None
+    dow_futures:    Optional[float] = None
+    nasdaq_futures: Optional[float] = None
+    nikkei_futures: Optional[float] = None
+
+
+class CryptoQuote(BaseModel):
+    symbol:        str    # "BTC", "ETH", "SOL"
+    name:          str    # "Bitcoin", etc.
+    price_usd:     float
+    change_pct_24h: float
+    market_cap_usd: Optional[float] = None
 
 
 class NewsItem(BaseModel):
@@ -106,4 +150,7 @@ class WSMessage(BaseModel):
     llm_analysis: Optional[LLMAnalysis] = None
     news: list[NewsItem]
     market_movers: MarketMovers
-    index_movers: Optional[dict[str, IndexMovers]] = None
+    index_movers:   Optional[dict[str, IndexMovers]] = None
+    nifty_futures:  Optional[list[FuturesContract]]  = None
+    fii_dii:        Optional[list[FIIDIIEntry]]       = None
+    crypto:         Optional[list[CryptoQuote]]       = None

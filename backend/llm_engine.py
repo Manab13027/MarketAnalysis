@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import anthropic
+import httpx
 
 from backend.models import LLMAnalysis
 
@@ -27,10 +28,62 @@ RESPOND ONLY WITH VALID JSON matching this exact schema:
 }"""
 
 
+OLLAMA_BASE    = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL   = os.getenv("OLLAMA_MODEL",   "qwen2.5:14b")
+
+
 class LLMEngine:
     def __init__(self, api_key: Optional[str] = None) -> None:
         self.api_key  = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-        self._client  = anthropic.Anthropic(api_key=self.api_key)
+        self._client  = anthropic.Anthropic(api_key=self.api_key) if self.api_key else None
+
+    def _call_ollama(self, user_msg: str) -> Optional[str]:
+        """Call local Ollama instance. Returns raw text or None."""
+        # First warm up the model (keep-alive ping) then do the real call
+        try:
+            httpx.post(
+                f"{OLLAMA_BASE}/api/generate",
+                json={"model": OLLAMA_MODEL, "prompt": "", "keep_alive": "10m"},
+                timeout=30.0,
+            )
+        except Exception:
+            pass  # non-fatal — just speeds up the main call
+        try:
+            r = httpx.post(
+                f"{OLLAMA_BASE}/api/chat",
+                json={
+                    "model":    OLLAMA_MODEL,
+                    "messages": [
+                        {"role": "system",  "content": SYSTEM_PROMPT},
+                        {"role": "user",    "content": user_msg},
+                    ],
+                    "stream":  False,
+                    "format":  "json",
+                    "options": {"temperature": 0.3},
+                },
+                timeout=180.0,   # 3 min — large models need time on first load
+            )
+            r.raise_for_status()
+            return r.json()["message"]["content"]
+        except Exception as e:
+            print(f"[llm_engine] ollama error: {e}")
+            return None
+
+    def _call_anthropic(self, user_msg: str) -> Optional[str]:
+        """Call Anthropic API. Returns raw text or None."""
+        if not self._client:
+            return None
+        try:
+            response = self._client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=512,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_msg}],
+            )
+            return response.content[0].text.strip()
+        except Exception as e:
+            print(f"[llm_engine] anthropic error: {e}")
+            return None
 
     def analyze(
         self,
@@ -76,14 +129,11 @@ Recent Headlines:
 
 Produce the JSON analysis now."""
 
+        # Try Ollama first (free, local), fall back to Anthropic
+        raw = self._call_ollama(user_msg) or self._call_anthropic(user_msg)
+        if not raw:
+            return None
         try:
-            response = self._client.messages.create(
-                model="claude-sonnet-4-5",
-                max_tokens=512,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_msg}],
-            )
-            raw = response.content[0].text.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]
                 if raw.startswith("json"):
@@ -99,7 +149,7 @@ Produce the JSON analysis now."""
                 updated_at=datetime.now(timezone.utc),
             )
         except Exception as e:
-            print(f"[llm_engine] error: {e}")
+            print(f"[llm_engine] parse error: {e} — raw: {raw[:200]}")
             return None
 
 
@@ -110,9 +160,8 @@ async def start_llm_engine(app_state: dict, db_path: str) -> None:
     global _av_snapshot, _av_last_fetch
 
     engine = LLMEngine()
+    await asyncio.sleep(30)  # wait for data_engine + ML to populate app_state first
     while True:
-        await asyncio.sleep(300)   # LLM runs every 5 minutes
-
         # Refresh Alpha Vantage macro snapshot every 2 hours
         now = time.monotonic()
         if now - _av_last_fetch > AV_REFRESH_INTERVAL:
@@ -146,7 +195,10 @@ async def start_llm_engine(app_state: dict, db_path: str) -> None:
                 "sp500":     movers.get("sp500", 0),
             }
             status = (payload.get("market_status") or {}).get("status", "unknown")
-            analysis = engine.analyze(ml_summary, headlines, macro, status, macro_av=_av_snapshot)
+            loop = asyncio.get_running_loop()
+            analysis = await loop.run_in_executor(
+                None, engine.analyze, ml_summary, headlines, macro, status, _av_snapshot
+            )
             if analysis:
                 app_state["latest_llm_analysis"] = analysis
                 await save_llm_analysis(db_path, {
@@ -161,3 +213,5 @@ async def start_llm_engine(app_state: dict, db_path: str) -> None:
                 })
         except Exception as e:
             print(f"[llm_engine loop] error: {e}")
+
+        await asyncio.sleep(300)  # then every 5 minutes

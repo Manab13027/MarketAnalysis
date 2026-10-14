@@ -4,20 +4,21 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        mono: ["'JetBrains Mono'", "Menlo", "monospace"],
+        mono: ["'Share Tech Mono'", "'IBM Plex Mono'", "'JetBrains Mono'", "Menlo", "monospace"],
+        display: ["'VT323'", "'Share Tech Mono'", "'IBM Plex Mono'", "sans-serif"],
       },
       colors: {
         terminal: {
-          bg:     "#0f1117",
-          panel:  "#1a1f2e",
-          border: "#2d3748",
-          green:  "#22c55e",
-          red:    "#ef4444",
-          amber:  "#f59e0b",
-          blue:   "#60a5fa",
-          muted:  "#64748b",
-          label:  "#94a3b8",
-          text:   "#e2e8f0",
+          bg:     "#020403",
+          panel:  "#041108",
+          border: "#1f4d2f",
+          green:  "#4ade80",
+          red:    "#f97373",
+          amber:  "#c6f36b",
+          blue:   "#6ee7a8",
+          muted:  "#5f7a68",
+          label:  "#93c5aa",
+          text:   "#d7ffd6",
         }
       }
     }
